@@ -1,4 +1,4 @@
-module github.com/conejoninja/gamelink
+module github.com/conejoninja/gamelink-examples
 
 go 1.22.1
 
