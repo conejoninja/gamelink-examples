@@ -93,7 +93,7 @@ func main() {
 	for {
 		select {
 		case <-ticker.C:
-			printStats()
+			//printStats()
 		default:
 			time.Sleep(100 * time.Millisecond)
 		}
@@ -143,7 +143,7 @@ func setupI2CPorts() bool {
 }
 
 func portListener(port byte) {
-	buf := make([]byte, DataSize+1) // Buffer extra para seguridad
+	buf := make([]byte, DataSize)
 
 	println("Starting listener for port", port)
 
@@ -250,6 +250,7 @@ func addMessage(cb *CircularBuffer, data []byte, length byte) bool {
 	for i := byte(0); i < length && i < DataSize; i++ {
 		msg.data[i] = data[i]
 	}
+	println("ADD MESSAGE", msg.data[0], msg.data[1], msg.data[2], msg.data[3], length)
 
 	// Avanzar puntero tail
 	cb.tail = (cb.tail + 1) % BufferSize
@@ -270,7 +271,7 @@ func getMessage(cb *CircularBuffer) (Message, bool) {
 	cb.buffer[cb.head].valid = false
 	cb.head = (cb.head + 1) % BufferSize
 	cb.count--
-
+	println("GET MESSAGE", msg.data[0], msg.data[1], msg.data[2], msg.data[3])
 	return msg, true
 }
 
