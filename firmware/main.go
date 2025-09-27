@@ -150,7 +150,7 @@ func portListener(port byte) {
 	for {
 		// Esperar eventos I2C con timeout implícito
 		evt, n, err := ports[port].WaitForEvent(buf)
-
+		println("EVT", evt, n, err)
 		if err != nil {
 			bridge.errorCount[port]++
 			continue

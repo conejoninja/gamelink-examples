@@ -30,6 +30,8 @@ const (
 	WIN
 	LOSE
 	NONE
+	START_GL
+	NO_GL
 )
 
 const (
@@ -65,6 +67,7 @@ var (
 
 	matrixBtn [12]bool
 	colors    []uint32
+	play      uint8
 )
 
 const (
@@ -97,7 +100,7 @@ func main() {
 	time.Sleep(3 * time.Second)
 	i2c := machine.I2C0
 	i2c.Configure(machine.I2CConfig{
-		Frequency: 2.8 * machine.MHz,
+		Frequency: 400 * machine.KHz,
 		SDA:       machine.GPIO12,
 		SCL:       machine.GPIO13,
 	})
@@ -112,7 +115,13 @@ func main() {
 	display.ClearDisplay()
 
 	gl := gamelink.New(i2c)
-	gl.Configure()
+	data, err := gl.Configure()
+
+	if err != nil {
+		println("ERROR [GL]", err)
+	}
+	println(data[0], data[1], data[2])
+	hasGameLink := (data[0] == 0x02)
 
 	enc := encoders.NewQuadratureViaInterrupt(
 		machine.GPIO4,
@@ -144,12 +153,47 @@ func main() {
 	menuOption := 0
 	pressed := -1
 
+	state = NO_GL
+	if hasGameLink {
+		state = START_GL
+	}
+
 	for {
 		display.ClearBuffer()
 
 		getMatrixState()
 
 		switch state {
+		case START_GL:
+
+			if rotaryNewValue = enc.Position(); rotaryNewValue != rotaryOldValue {
+				println("value: ", rotaryNewValue)
+				if rotaryNewValue > rotaryOldValue {
+					menuOption = 1
+				} else {
+					menuOption = 0
+				}
+				rotaryOldValue = rotaryNewValue
+			}
+
+			if menuOption == 0 {
+				tinyfont.WriteLine(&display, &proggy.TinySZ8pt7b, 10, 20, "[+] USE GAME LINK", textWhite)
+				tinyfont.WriteLine(&display, &proggy.TinySZ8pt7b, 10, 34, "[ ] CANCEL", textWhite)
+			} else {
+				tinyfont.WriteLine(&display, &proggy.TinySZ8pt7b, 10, 20, "[ ] USE GAME LINK", textWhite)
+				tinyfont.WriteLine(&display, &proggy.TinySZ8pt7b, 10, 34, "[+] CANCEL", textWhite)
+			}
+
+			if !rotaryBtn.Get() {
+				println("pressed")
+				if menuOption == 0 {
+					state = MENU
+				} else {
+					state = LOSE
+				}
+			}
+
+			break
 		case MENU:
 
 			if rotaryNewValue = enc.Position(); rotaryNewValue != rotaryOldValue {
@@ -205,7 +249,7 @@ func main() {
 			} else {
 				colors[pressed] = blue
 			}
-			gl.Write([]uint8{KEY_PRESSED, uint8(pressed)})
+			gl.Write([]uint8{KEY_PRESSED, uint8(pressed), uint8(pressed), uint8(pressed)})
 			state = GAME_WAIT_OTHER
 			break
 		case GAME_WAIT_OTHER:
@@ -214,10 +258,11 @@ func main() {
 				break
 			}
 			if buffer[0] == KEY_PRESSED {
+				play = getPlayFromBuffer(buffer[1], buffer[2], buffer[3])
 				if hostGame {
-					colors[buffer[1]] = blue
+					colors[play] = blue
 				} else {
-					colors[buffer[1]] = red
+					colors[play] = red
 				}
 				state = GAME_WAIT_KEY
 			}
@@ -237,6 +282,9 @@ func main() {
 			break
 		case LOSE:
 			tinyfont.WriteLine(&display, &proggy.TinySZ8pt7b, 10, 20, "You LOSE", textWhite)
+			break
+		case NO_GL:
+			tinyfont.WriteLine(&display, &proggy.TinySZ8pt7b, 10, 20, "GameLink not found", textWhite)
 			break
 		}
 
@@ -329,4 +377,13 @@ func checkTicTacToe() int8 {
 
 	return NONE
 
+}
+
+func getPlayFromBuffer(b1, b2, b3 uint8) uint8 {
+	if b1 == b2 || b1 == b3 {
+		return b1
+	} else if b2 == b3 {
+		return b2
+	}
+	return b1
 }
